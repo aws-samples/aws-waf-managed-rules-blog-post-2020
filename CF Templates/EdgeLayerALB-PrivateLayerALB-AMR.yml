@@ -14,7 +14,7 @@
 #SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # Defense in Depth using AWS WAF Managed Rules
-# Using only AWS Managed Rules for both Edge and Public Network Layers
+# Using only AWS Managed Rules for both Edge and Public Network Layers on Application Load balancers
 # https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html
 ---
 AWSTemplateFormatVersion: 2010-09-09
@@ -64,7 +64,7 @@ Metadata:
       HTTPPostFloodRateParam:
        default: "HTTP Post Flood Protection"
       HTTPPostLoginParam:
-       default: "Login URL"        
+       default: "Login URL"
 Parameters:
   PublicLayerWebACLNameParam:
     Description: "AWS WAF WebACL Name that would be accosiated to an Application Load Balancer in a public subnet"
@@ -129,7 +129,7 @@ Resources:
       Name: !Ref PublicLayerWebACLNameParam
       Scope: REGIONAL
       Description: Public Application Web ACL using AWS Managed Rules.
-      DefaultAction: 
+      DefaultAction:
         Allow: {}
       VisibilityConfig:
         SampledRequestsEnabled: true
@@ -141,7 +141,7 @@ Resources:
       Tags:
         - Key: Layer
           Value: Public
-      Rules: 
+      Rules:
         - Name: HTTPGetFloodPProtection
           Priority: 0
           Action:
@@ -179,7 +179,7 @@ Resources:
                 AndStatement:
                   Statements:
                   - ByteMatchStatement:
-                      SearchString: !Ref HTTPPostLoginParam 
+                      SearchString: !Ref HTTPPostLoginParam
                       FieldToMatch:
                         UriPath: {}
                       TextTransformations:
@@ -231,7 +231,7 @@ Resources:
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
-              Name: AWSManagedRulesCommonRuleSet 
+              Name: AWSManagedRulesCommonRuleSet
               ExcludedRules: !Ref AMRCommonRuleSetExcludedRules
         - Name: AWS-AWSManagedRulesKnownBadInputsRuleSet
           Priority: 5
@@ -244,7 +244,7 @@ Resources:
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
-              Name: AWSManagedRulesKnownBadInputsRuleSet 
+              Name: AWSManagedRulesKnownBadInputsRuleSet
               ExcludedRules: !Ref AMRKnownBadInputsExcludedRules
         - Name: AWS-AWSManagedRulesAdminProtectionRuleSet
           Priority: 6
@@ -258,14 +258,14 @@ Resources:
             ManagedRuleGroupStatement:
               VendorName: AWS
               Name: AWSManagedRulesAdminProtectionRuleSet
-              ExcludedRules: !Ref AMRAdminProtectionExcludedRules         
+              ExcludedRules: !Ref AMRAdminProtectionExcludedRules
   PrivateLayerWebACL:
     Type: AWS::WAFv2::WebACL
     Properties:
       Name: !Ref PrivateLayerWebACLNameParam
       Scope: REGIONAL
       Description: Private Application Web ACL using AWS Managed Rules.
-      DefaultAction: 
+      DefaultAction:
         Allow: {}
       VisibilityConfig:
         SampledRequestsEnabled: true
@@ -277,10 +277,10 @@ Resources:
       Tags:
         - Key: Layer
           Value: Application
-      Rules: 
+      Rules:
         - Name: AWS-AWSManagedRulesSQLiRuleSet
           Priority: 0
-          OverrideAction: 
+          OverrideAction:
             None: {}
           VisibilityConfig:
             SampledRequestsEnabled: true
@@ -302,7 +302,7 @@ Resources:
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
-              Name: AWSManagedRulesLinuxRuleSet 
+              Name: AWSManagedRulesLinuxRuleSet
               ExcludedRules: !Ref AMRLinuxRuleSetExcludedRules
         - Name: AWS-AWSManagedRulesUnixRuleSet
           Priority: 2
@@ -328,7 +328,7 @@ Resources:
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
-              Name: AWSManagedRulesPHPRuleSet 
+              Name: AWSManagedRulesPHPRuleSet
               ExcludedRules: !Ref AMRPHPRuleSetExcludedRules
         - Name: AWS-AWSManagedRulesWordPressRuleSet
           Priority: 4

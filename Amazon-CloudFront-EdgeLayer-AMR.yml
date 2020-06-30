@@ -1,0 +1,221 @@
+#Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+#Permission is hereby granted, free of charge, to any person obtaining a copy of this
+#software and associated documentation files (the "Software"), to deal in the Software
+#without restriction, including without limitation the rights to use, copy, modify,
+#merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+#permit persons to whom the Software is furnished to do so.
+
+#THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+#INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+#PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Defense in Depth using AWS WAF Managed Rules
+# Using only AWS Managed Rules for the Edge Network Layer on Amazon CloudFront
+# https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Defence in depth with AWS WAF Managed Rules.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Edge Network AWS WAF WebACL Name"
+        Parameters:
+          - EdgeNetworkWebACLNameParam
+      -
+        Label:
+          default: "Edge Network AWS Managed Rule Controls"
+        Parameters:
+          - HTTPGetFloodRateParam
+          - HTTPPostFloodRateParam
+          - HTTPPostLoginParam
+          - AMRCommonRuleSetExcludedRules
+          - AMRAdminProtectionExcludedRules
+          - AMRKnownBadInputsExcludedRules
+    ParameterLabels:
+      EdgeNetworkWebACLNameParam:
+        default: "Web ACL Name"
+      AMRCommonRuleSetExcludedRules:
+        default: "AWSManagedRuleCommonRuleSet"
+      HTTPGetFloodRateParam:
+       default: "HTTP Get Flood Protection"
+      HTTPPostFloodRateParam:
+       default: "HTTP Post Flood Protection"
+      HTTPPostLoginParam:
+       default: "Login URL"        
+Parameters:
+  EdgeNetworkWebACLNameParam:
+    Description: "AWS WAF WebACL Name that would be accosiated to an Amazon CloudFront distribution"
+    Type: String
+    Default: Edge-Network-Layer-WebACL
+  AMRCommonRuleSetExcludedRules:
+    Description: "By default all rules are set to count mode during an evaluation period. If you want rules to be fully enforced at deployment remove selected or all default inputs."
+    Type: CommaDelimitedList
+    Default: NoUserAgent_HEADER, UserAgent_BadBots_HEADER, SizeRestrictions_QUERYSTRING, SizeRestrictions_Cookie_HEADER, SizeRestrictions_BODY, SizeRestrictions_URIPATH, EC2MetaDataSSRF_BODY, EC2MetaDataSSRF_COOKIE, EC2MetaDataSSRF_URIPATH, EC2MetaDataSSRF_QUERYARGUMENTS, GenericLFI_QUERYARGUMENTS, GenericLFI_URIPATH, GenericLFI_BODY, RestrictedExtensions_URIPATH, RestrictedExtensions_QUERYARGUMENTS, GenericRFI_QUERYARGUMENTS, GenericRFI_BODY, GenericRFI_URIPATH, CrossSiteScripting_COOKIE, CrossSiteScripting_QUERYARGUMENTS, CrossSiteScripting_BODY, CrossSiteScripting_URIPATH
+  AMRAdminProtectionExcludedRules:
+    Description: "By default all rules are set to count mode during an evaluation period. If you want rules to be fully enforced at deployment remove selected or all default inputs."
+    Type: CommaDelimitedList
+    Default: AdminProtection_URIPATH
+  AMRKnownBadInputsExcludedRules:
+    Description: "By default all rules are set to count mode during an evaluation period. If you want rules to be fully enforced at deployment remove selected or all default inputs."
+    Type: CommaDelimitedList
+    Default: Host_localhost_HEADER, PROPFIND_METHOD, ExploitablePaths_URIPATH, BadAuthToken_COOKIE_AUTHORIZATION
+  HTTPGetFloodRateParam:
+    Description: "A Rate-Based Rule looking for a maximum rate of a single IP address can perform HTTP Get requests in 5 minutes"
+    Type: Number
+    Default: 10000
+    MinValue: 100
+    MaxValue: 20000000
+  HTTPPostFloodRateParam:
+    Description: "A Rate-Based Rule looking for a maximum rate of a single IP address can perform HTTP Post requests in 5 minutes"
+    Type: Number
+    Default: 1000
+    MinValue: 100
+    MaxValue: 20000000
+  HTTPPostLoginParam:
+    Description: "Enter the URI for a Login page to rate-limit IP addresses from login attemps. Leave this blank for universal HTTP Post rate-limit"
+    Type: String
+    Default: login
+Resources:
+  EdgeLayerWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Ref EdgeNetworkWebACLNameParam
+      Scope: CLOUDFRONT
+      Description: Edge Network Web ACL using AWS Managed Rules.
+      DefaultAction: 
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Join
+            - ""
+            - - !Ref EdgeNetworkWebACLNameParam
+              - "Metric"
+      Tags:
+        - Key: Layer
+          Value: EdgeNetwork
+      Rules: 
+        - Name: HTTPGetFloodPProtection
+          Priority: 0
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateBased
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref HTTPGetFloodRateParam
+              AggregateKeyType: IP
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  SearchString: get
+                  FieldToMatch:
+                    Method: {}
+                  TextTransformations:
+                  - Priority: 0
+                    Type: LOWERCASE
+                  PositionalConstraint: EXACTLY
+        - Name: HTTPPostFloodPProtection
+          Priority: 1
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: test
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref HTTPPostFloodRateParam
+              AggregateKeyType: IP
+              ScopeDownStatement:
+                AndStatement:
+                  Statements:
+                  - ByteMatchStatement:
+                      SearchString: !Ref HTTPPostLoginParam 
+                      FieldToMatch:
+                        UriPath: {}
+                      TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+                      - Priority: 1
+                        Type: URL_DECODE
+                      PositionalConstraint: CONTAINS
+                  - ByteMatchStatement:
+                      SearchString: post
+                      FieldToMatch:
+                        Method: {}
+                      TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+                      PositionalConstraint: EXACTLY
+        - Name: AWS-AWSManagedRulesAmazonIpReputationList
+          Priority: 2
+          OverrideAction:
+            Count: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: MetricForAMRIPRepList
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+        - Name: AWS-AWSManagedRulesAnonymousIpList
+          Priority: 3
+          OverrideAction:
+            Count: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: MetricForAMRAnonIpList
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAnonymousIpList
+        - Name: AWS-AWSManagedRulesCommonRuleSet
+          Priority: 4
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: MetricForAMRCRS
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet 
+              ExcludedRules: !Ref AMRCommonRuleSetExcludedRules
+        - Name: AWS-AWSManagedRulesKnownBadInputsRuleSet
+          Priority: 5
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: MetricForAMRKnownBadInputs
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet 
+              ExcludedRules: !Ref AMRKnownBadInputsExcludedRules
+        - Name: AWS-AWSManagedRulesAdminProtectionRuleSet
+          Priority: 6
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: MetricForAMRAdminProtection
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAdminProtectionRuleSet
+              ExcludedRules: !Ref AMRAdminProtectionExcludedRules         

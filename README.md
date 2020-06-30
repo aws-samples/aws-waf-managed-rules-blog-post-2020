@@ -1,9 +1,6 @@
 ## Defense In Depth using AWS Managed Rules - Blog Post
 
-
-Be sure to:
-
-* Edit your repository description on GitHub
+This repo is used to serve customers the referenced cloudformation templates. 
 
 ## Security
 

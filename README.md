@@ -1,10 +1,8 @@
-## My Project
+## Defense In Depth using AWS Managed Rules - Blog Post
 
-TODO: Fill this README out!
 
 Be sure to:
 
-* Change the title in this README
 * Edit your repository description on GitHub
 
 ## Security

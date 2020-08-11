@@ -57,8 +57,6 @@ Metadata:
         default: "Web ACL Name"
       AMRCommonRuleSetExcludedRules:
         default: "AWSManagedRuleCommonRuleSet"
-      ApplicationWebACLNameParam:
-        default: "Web ACL Name"
       HTTPGetFloodRateParam:
        default: "HTTP Get Flood Protection"
       HTTPPostFloodRateParam:
